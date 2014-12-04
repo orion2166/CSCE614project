@@ -428,18 +428,21 @@ cache_create(char *name,		/* name of the cache */
 	//------------------------------------------------------------------------
 	cp -> LRU_list = (struct cache_set_t *)calloc(cp->hsize,
 					  sizeof(struct cache_set_t *));
-	for(i = 0;i < nsets;i++)
+	for(bindex = 0,i = 0;i < nsets;i++)
 	{
+		cp->LRU_list[i].blks = CACHE_BINDEX(cp, cp->data, bindex);
 		for(j = 0;i < assoc;j++)
 		{
-			blk = LRU_list[i].blks[j];
+			blk = CACHE_BINDEX(cp, cp->data, bindex);
+			bindex++;
+			
 			blk->status = 0;
 			blk->tag = 0;
 			blk->ready = 0;
 			blk->last_used=0;
 			blk->user_data = (usize != 0
 			    ? (byte_t *)calloc(usize, sizeof(byte_t)) : NULL);
-			
+			LRU_list[i].blks[j] = blk;
 		}
 	}
 	//------------------------------------------------------------------------
