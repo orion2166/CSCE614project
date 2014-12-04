@@ -418,7 +418,23 @@ cache_create(char *name,		/* name of the cache */
 	nsets === number of blocks
 	array is size of cache_blk_t for cache block addressing*/
 	//------------------------------------------------------------------------
-	cp -> LRU_list = malloc(nsets * sizeof(cache_blk_t));
+	cp -> LRU_list = (struct cache_set_t *)calloc(cp->hsize,
+					  sizeof(struct cache_set_t *));
+	int i,j;
+	for(i = 0;i < nsets;i++)
+	{
+		for(j = 0;i < assoc;j++)
+		{
+			blk = LRU_list[i] -> blks[j];
+			blk->status = 0;
+			blk->tag = 0;
+			blk->ready = 0;
+			blk->last_used=0;
+			blk->user_data = (usize != 0
+			    ? (byte_t *)calloc(usize, sizeof(byte_t)) : NULL);
+			
+		}
+	}
 	//------------------------------------------------------------------------
 	
   return cp;
