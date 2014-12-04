@@ -256,6 +256,21 @@ update_way_list(struct cache_set_t *set,	/* set contained way chain */
     panic("bogus WHERE designator");
 }
 
+/* Search which block to replace  */
+int LRU_search(cache_blk_t *a, int size, tick_t now)
+{
+    int i,max=0,indx=0;
+    for(i=0;i<sizei++)
+    {
+	if(now - a[i].last_used > max)
+	{
+		max = now - a[i].last_used;
+		indx = i;
+	}
+    }
+    return indx;
+}
+
 /* create and initialize a general cache structure */
 struct cache_t *			/* pointer to cache created */
 cache_create(char *name,		/* name of the cache */
