@@ -257,14 +257,14 @@ update_way_list(struct cache_set_t *set,	/* set contained way chain */
 }
 
 /* Search which block to replace  */
-int LRU_search(cache_blk_t *a, int size, tick_t now)
+struct cache_blk_t* LRU_search(struct cache_blk_t *a, int size, tick_t now)
 {
     int i,max=0,indx=0;
     for(i=0;i<size;i++)
     {
-	if(a[i]==NULL)
+	if(a[i].status == 0)
 	{
-	    return i;
+	    return &a[i];
 	}
     }
     for(i=0;i<size;i++)
@@ -275,7 +275,7 @@ int LRU_search(cache_blk_t *a, int size, tick_t now)
 		indx = i;
 	}
     }
-    return indx;
+    return &a[indx];
 }
 
 /* create and initialize a general cache structure */
@@ -428,12 +428,11 @@ cache_create(char *name,		/* name of the cache */
 	//------------------------------------------------------------------------
 	cp -> LRU_list = (struct cache_set_t *)calloc(cp->hsize,
 					  sizeof(struct cache_set_t *));
-	int i,j;
 	for(i = 0;i < nsets;i++)
 	{
 		for(j = 0;i < assoc;j++)
 		{
-			blk = LRU_list[i] -> blks[j];
+			blk = LRU_list[i].blks[j];
 			blk->status = 0;
 			blk->tag = 0;
 			blk->ready = 0;
@@ -558,7 +557,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
   md_addr_t set = CACHE_SET(cp, addr);
   md_addr_t bofs = CACHE_BLK(cp, addr);
   struct cache_blk_t *blk, *repl;
-  int lat = 0;
+  int lat = 0,i;
 
   /* default replacement address */
   if (repl_addr)
@@ -623,39 +622,40 @@ cache_access(struct cache_t *cp,	/* cache to access */
   /* select the appropriate block to replace, and re-link this entry to
      the appropriate place in the way list */
   switch (cp->policy) {
-  case LRU:
-    repl = LRU_search(); 
-  case FIFO:
-    repl = cp->sets[set].way_tail;
-    update_way_list(&cp->sets[set], repl, Head);
-    break;
-  case Random:
-    {
-      int bindex = myrand() & (cp->assoc - 1);
-      repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
-    }
-    break;
-  default:
-    panic("bogus replacement policy");
-  }
+	  case LRU:
+	    repl = LRU_search(cp->LRU_list[set].blks,cp->assoc,now);
+	    break;
+	  case FIFO:
+	    repl = cp->sets[set].way_tail;
+	    update_way_list(&cp->sets[set], repl, Head);
+	    break;
+	  case Random:
+	    {
+	      int bindex = myrand() & (cp->assoc - 1);
+	      repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
+	    }
+	    break;
+	  default:
+	    panic("bogus replacement policy");
+	  }
 
-  /* remove this block from the hash bucket chain, if hash exists */
-  if (cp->hsize)
-    unlink_htab_ent(cp, &cp->sets[set], repl);
+	  /* remove this block from the hash bucket chain, if hash exists */
+	  if (cp->hsize)
+	    unlink_htab_ent(cp, &cp->sets[set], repl);
 
-  /* blow away the last block to hit */
-  cp->last_tagset = 0;
-  cp->last_blk = NULL;
+	  /* blow away the last block to hit */
+	  cp->last_tagset = 0;
+	  cp->last_blk = NULL;
 
-  /* write back replaced block data */
-  if (repl->status & CACHE_BLK_VALID)
-    {
-      cp->replacements++;
+	  /* write back replaced block data */
+	  if (repl->status & CACHE_BLK_VALID)
+	    {
+	      cp->replacements++;
 
-      if (repl_addr)
-	*repl_addr = CACHE_MK_BADDR(cp, repl->tag, set);
- 
-      /* don't replace the block until outstanding misses are satisfied */
+	      if (repl_addr)
+		*repl_addr = CACHE_MK_BADDR(cp, repl->tag, set);
+	 
+	      /* don't replace the block until outstanding misses are satisfied */
       lat += BOUND_POS(repl->ready - now);
  
       /* stall until the bus to next level of memory is available */

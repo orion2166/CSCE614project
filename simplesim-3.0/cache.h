@@ -305,4 +305,6 @@ cache_flush_addr(struct cache_t *cp,	/* cache instance to flush */
 		 md_addr_t addr,	/* address of block to flush */
 		 tick_t now);		/* time of cache flush */
 
+/* Search which block to replace  */
+struct cache_blk_t* LRU_search(struct cache_blk_t *a, int size, tick_t now);
 #endif /* CACHE_H */
