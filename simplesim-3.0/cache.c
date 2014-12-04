@@ -398,6 +398,14 @@ cache_create(char *name,		/* name of the cache */
 	    cp->sets[i].way_tail = blk;
 	}
     }
+	
+	/* here is were we initialize the LRU size based off the the number of sets """nsets""" variable for size
+	nsets === number of blocks
+	array is size of cache_blk_t for cache block addressing*/
+	//------------------------------------------------------------------------
+	cp -> LRU_list = malloc(nsets * sizeof(cache_blk_t));
+	//------------------------------------------------------------------------
+	
   return cp;
 }
 
