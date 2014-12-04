@@ -442,7 +442,7 @@ cache_create(char *name,		/* name of the cache */
 			blk->last_used=0;
 			blk->user_data = (usize != 0
 			    ? (byte_t *)calloc(usize, sizeof(byte_t)) : NULL);
-			LRU_list[i].blks[j] = blk;
+			cp->LRU_list[i].blks[j] = *blk;
 		}
 	}
 	//------------------------------------------------------------------------
@@ -560,7 +560,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
   md_addr_t set = CACHE_SET(cp, addr);
   md_addr_t bofs = CACHE_BLK(cp, addr);
   struct cache_blk_t *blk, *repl;
-  int lat = 0,i;
+  int lat = 0,i,j;
 
   /* default replacement address */
   if (repl_addr)
@@ -576,6 +576,15 @@ cache_access(struct cache_t *cp,	/* cache to access */
   if ((addr + nbytes) > ((addr & ~cp->blk_mask) + cp->bsize))
     fatal("cache: access error: access spans block, addr 0x%08x", addr);
 
+  /* Print to debug */
+  for(i=0;i<cp->nsets;i++)
+  {
+	printf("\nSet=%d\n",i);
+	for(j=0;j<cp->assoc;j++)
+	{
+	    printf("tag=%lu timestamp=%d\n",(unsigned long) cp->LRU_list[i].blks[j].tag,(unsigned long) cp->LRU_list[i].blks[j].last_used);
+	}
+  }
   /* permissions are checked on cache misses */
 
   /* check for a fast hit: access to same block */
@@ -604,9 +613,12 @@ cache_access(struct cache_t *cp,	/* cache to access */
       /* low-associativity cache, linear search the way list */
 	   for (i = 0;i < cp->nsets;i++)
 		{
-			blk  = cp->LRU_list[i];
+			for(j=0;j<cp->assoc;j++)
+			{
+			blk  = &(cp->LRU_list[i].blks[j]);
 			if (blk->tag == tag && (blk->status & CACHE_BLK_VALID))
 				goto cache_hit;
+			}
 		} 
       for (blk=cp->sets[set].way_head;
 	   blk;
@@ -627,6 +639,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
   switch (cp->policy) {
 	  case LRU:
 	    repl = LRU_search(cp->LRU_list[set].blks,cp->assoc,now);
+	    printf("search output Set=%d tag=%lu\n",set,(unsigned long) repl->tag);
 	    break;
 	  case FIFO:
 	    repl = cp->sets[set].way_tail;
