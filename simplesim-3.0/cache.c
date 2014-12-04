@@ -576,6 +576,12 @@ cache_access(struct cache_t *cp,	/* cache to access */
   else
     {
       /* low-associativity cache, linear search the way list */
+	   for (i = 0;i < cp->nsets;i++)
+		{
+			blk  = cp->LRU_list[i];
+			if (blk->tag == tag && (blk->status & CACHE_BLK_VALID))
+				goto cache_hit;
+		} 
       for (blk=cp->sets[set].way_head;
 	   blk;
 	   blk=blk->way_next)
