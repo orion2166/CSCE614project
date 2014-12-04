@@ -260,7 +260,14 @@ update_way_list(struct cache_set_t *set,	/* set contained way chain */
 int LRU_search(cache_blk_t *a, int size, tick_t now)
 {
     int i,max=0,indx=0;
-    for(i=0;i<sizei++)
+    for(i=0;i<size;i++)
+    {
+	if(a[i]==NULL)
+	{
+	    return i;
+	}
+    }
+    for(i=0;i<size;i++)
     {
 	if(now - a[i].last_used > max)
 	{
@@ -396,6 +403,7 @@ cache_create(char *name,		/* name of the cache */
 	  blk->status = 0;
 	  blk->tag = 0;
 	  blk->ready = 0;
+	  blk->last_used = 0;
 	  blk->user_data = (usize != 0
 			    ? (byte_t *)calloc(usize, sizeof(byte_t)) : NULL);
 
@@ -600,6 +608,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
      the appropriate place in the way list */
   switch (cp->policy) {
   case LRU:
+    repl = LRU_search(); 
   case FIFO:
     repl = cp->sets[set].way_tail;
     update_way_list(&cp->sets[set], repl, Head);
@@ -652,7 +661,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
   /* update block tags */
   repl->tag = tag;
   repl->status = CACHE_BLK_VALID;	/* dirty bit set on update */
-
+  repl->last_used = now;
   /* read data block */
   lat += cp->blk_access_fn(Read, CACHE_BADDR(cp, addr), cp->bsize,
 			   repl, now+lat);
@@ -687,6 +696,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
   /* **HIT** */
   cp->hits++;
 
+  blk->last_used = now;
   /* copy data out of cache block, if block exists */
   if (cp->balloc)
     {
@@ -721,7 +731,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
   
   /* **FAST HIT** */
   cp->hits++;
-
+  blk->last_used = now;
   /* copy data out of cache block, if block exists */
   if (cp->balloc)
     {
