@@ -213,7 +213,7 @@ struct cache_t
   
   /*LRU part of the code this variable will be a single dimensional array that will hand the LRU based off the set size*/
   //------------------------------------------------------------------------
-  struct cache_blk_t* LRU_list;
+  struct cache_set_t* LRU_list;
   //------------------------------------------------------------------------
   
 };
