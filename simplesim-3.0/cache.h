@@ -130,7 +130,6 @@ struct cache_blk_t
      defined in this structure! */
   byte_t data[1];		/* actual data block starts here, block size
 				   should probably be a multiple of 8 */
-  tick_t last_used;             /* Stores the time of last used and this is used in LRU replacement strategy */
 };
 
 /* cache set definition (one or more blocks sharing the same set index) */
@@ -210,12 +209,6 @@ struct cache_t
   /* NOTE: this is a variable-size tail array, this must be the LAST field
      defined in this structure! */
   struct cache_set_t sets[1];	/* each entry is a set */
-  
-  /*LRU part of the code this variable will be a single dimensional array that will hand the LRU based off the set size*/
-  //------------------------------------------------------------------------
-  struct cache_set_t* LRU_list;
-  //------------------------------------------------------------------------
-  
 };
 
 /* create and initialize a general cache structure */
@@ -305,6 +298,4 @@ cache_flush_addr(struct cache_t *cp,	/* cache instance to flush */
 		 md_addr_t addr,	/* address of block to flush */
 		 tick_t now);		/* time of cache flush */
 
-/* Search which block to replace  */
-struct cache_blk_t* LRU_search(struct cache_blk_t *a, int size, tick_t now);
 #endif /* CACHE_H */

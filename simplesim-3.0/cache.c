@@ -256,28 +256,6 @@ update_way_list(struct cache_set_t *set,	/* set contained way chain */
     panic("bogus WHERE designator");
 }
 
-/* Search which block to replace  */
-struct cache_blk_t* LRU_search(struct cache_blk_t *a, int size, tick_t now)
-{
-    int i,max=0,indx=0;
-    for(i=0;i<size;i++)
-    {
-	if(a[i].status == 0)
-	{
-	    return &a[i];
-	}
-    }
-    for(i=0;i<size;i++)
-    {
-	if(now - a[i].last_used > max)
-	{
-		max = now - a[i].last_used;
-		indx = i;
-	}
-    }
-    return &a[indx];
-}
-
 /* create and initialize a general cache structure */
 struct cache_t *			/* pointer to cache created */
 cache_create(char *name,		/* name of the cache */
@@ -403,7 +381,6 @@ cache_create(char *name,		/* name of the cache */
 	  blk->status = 0;
 	  blk->tag = 0;
 	  blk->ready = 0;
-	  blk->last_used = 0;
 	  blk->user_data = (usize != 0
 			    ? (byte_t *)calloc(usize, sizeof(byte_t)) : NULL);
 
@@ -421,32 +398,6 @@ cache_create(char *name,		/* name of the cache */
 	    cp->sets[i].way_tail = blk;
 	}
     }
-	
-	/* here is were we initialize the LRU size based off the the number of sets """nsets""" variable for size
-	nsets === number of blocks
-	array is size of cache_blk_t for cache block addressing*/
-	//------------------------------------------------------------------------
-	cp -> LRU_list = (struct cache_set_t *)calloc(cp->hsize,
-					  sizeof(struct cache_set_t *));
-	for(bindex = 0,i = 0;i < nsets;i++)
-	{
-		cp->LRU_list[i].blks = CACHE_BINDEX(cp, cp->data, bindex);
-		for(j = 0;i < assoc;j++)
-		{
-			blk = CACHE_BINDEX(cp, cp->data, bindex);
-			bindex++;
-			
-			blk->status = 0;
-			blk->tag = 0;
-			blk->ready = 0;
-			blk->last_used=0;
-			blk->user_data = (usize != 0
-			    ? (byte_t *)calloc(usize, sizeof(byte_t)) : NULL);
-			cp->LRU_list[i].blks[j] = *blk;
-		}
-	}
-	//------------------------------------------------------------------------
-	
   return cp;
 }
 
@@ -560,7 +511,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
   md_addr_t set = CACHE_SET(cp, addr);
   md_addr_t bofs = CACHE_BLK(cp, addr);
   struct cache_blk_t *blk, *repl;
-  int lat = 0,i,j;
+  int lat = 0;
 
   /* default replacement address */
   if (repl_addr)
@@ -576,15 +527,6 @@ cache_access(struct cache_t *cp,	/* cache to access */
   if ((addr + nbytes) > ((addr & ~cp->blk_mask) + cp->bsize))
     fatal("cache: access error: access spans block, addr 0x%08x", addr);
 
-  /* Print to debug */
-  for(i=0;i<cp->nsets;i++)
-  {
-	printf("\nSet=%d\n",i);
-	for(j=0;j<cp->assoc;j++)
-	{
-	    printf("tag=%lu timestamp=%d\n",(unsigned long) cp->LRU_list[i].blks[j].tag,(unsigned long) cp->LRU_list[i].blks[j].last_used);
-	}
-  }
   /* permissions are checked on cache misses */
 
   /* check for a fast hit: access to same block */
@@ -611,15 +553,6 @@ cache_access(struct cache_t *cp,	/* cache to access */
   else
     {
       /* low-associativity cache, linear search the way list */
-	   for (i = 0;i < cp->nsets;i++)
-		{
-			for(j=0;j<cp->assoc;j++)
-			{
-			blk  = &(cp->LRU_list[i].blks[j]);
-			if (blk->tag == tag && (blk->status & CACHE_BLK_VALID))
-				goto cache_hit;
-			}
-		} 
       for (blk=cp->sets[set].way_head;
 	   blk;
 	   blk=blk->way_next)
@@ -637,41 +570,38 @@ cache_access(struct cache_t *cp,	/* cache to access */
   /* select the appropriate block to replace, and re-link this entry to
      the appropriate place in the way list */
   switch (cp->policy) {
-	  case LRU:
-	    repl = LRU_search(cp->LRU_list[set].blks,cp->assoc,now);
-	    printf("search output Set=%d tag=%lu\n",set,(unsigned long) repl->tag);
-	    break;
-	  case FIFO:
-	    repl = cp->sets[set].way_tail;
-	    update_way_list(&cp->sets[set], repl, Head);
-	    break;
-	  case Random:
-	    {
-	      int bindex = myrand() & (cp->assoc - 1);
-	      repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
-	    }
-	    break;
-	  default:
-	    panic("bogus replacement policy");
-	  }
+  case LRU:
+  case FIFO:
+    repl = cp->sets[set].way_tail;
+    update_way_list(&cp->sets[set], repl, Head);
+    break;
+  case Random:
+    {
+      int bindex = myrand() & (cp->assoc - 1);
+      repl = CACHE_BINDEX(cp, cp->sets[set].blks, bindex);
+    }
+    break;
+  default:
+    panic("bogus replacement policy");
+  }
 
-	  /* remove this block from the hash bucket chain, if hash exists */
-	  if (cp->hsize)
-	    unlink_htab_ent(cp, &cp->sets[set], repl);
+  /* remove this block from the hash bucket chain, if hash exists */
+  if (cp->hsize)
+    unlink_htab_ent(cp, &cp->sets[set], repl);
 
-	  /* blow away the last block to hit */
-	  cp->last_tagset = 0;
-	  cp->last_blk = NULL;
+  /* blow away the last block to hit */
+  cp->last_tagset = 0;
+  cp->last_blk = NULL;
 
-	  /* write back replaced block data */
-	  if (repl->status & CACHE_BLK_VALID)
-	    {
-	      cp->replacements++;
+  /* write back replaced block data */
+  if (repl->status & CACHE_BLK_VALID)
+    {
+      cp->replacements++;
 
-	      if (repl_addr)
-		*repl_addr = CACHE_MK_BADDR(cp, repl->tag, set);
-	 
-	      /* don't replace the block until outstanding misses are satisfied */
+      if (repl_addr)
+	*repl_addr = CACHE_MK_BADDR(cp, repl->tag, set);
+ 
+      /* don't replace the block until outstanding misses are satisfied */
       lat += BOUND_POS(repl->ready - now);
  
       /* stall until the bus to next level of memory is available */
@@ -693,7 +623,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
   /* update block tags */
   repl->tag = tag;
   repl->status = CACHE_BLK_VALID;	/* dirty bit set on update */
-  repl->last_used = now;
+
   /* read data block */
   lat += cp->blk_access_fn(Read, CACHE_BADDR(cp, addr), cp->bsize,
 			   repl, now+lat);
@@ -728,7 +658,6 @@ cache_access(struct cache_t *cp,	/* cache to access */
   /* **HIT** */
   cp->hits++;
 
-  blk->last_used = now;
   /* copy data out of cache block, if block exists */
   if (cp->balloc)
     {
@@ -763,7 +692,7 @@ cache_access(struct cache_t *cp,	/* cache to access */
   
   /* **FAST HIT** */
   cp->hits++;
-  blk->last_used = now;
+
   /* copy data out of cache block, if block exists */
   if (cp->balloc)
     {
