@@ -378,6 +378,7 @@ cache_create(char *name,		/* name of the cache */
 	  bindex++;
 
 	  /* invalidate new cache block */
+	  blk->re_reference_value = 3;
 	  blk->status = 0;
 	  blk->tag = 0;
 	  blk->ready = 0;
