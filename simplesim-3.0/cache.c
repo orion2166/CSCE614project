@@ -52,6 +52,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <math.h>
 
 #include "host.h"
 #include "misc.h"
@@ -138,6 +139,42 @@
 
 /* bound sqword_t/dfloat_t to positive int */
 #define BOUND_POS(N)		((int)(MIN(MAX(0, (N)), 2147483647)))
+#define M_SRRIP 2
+
+/* Searches for block closest to head of waylist that has value 2^M -1 else increase them all */
+struct cache_blk_t* search_RRIP(struct cache_blk_t *head)
+{
+	struct cache_blk_t *temp;
+	int max=0,p;
+	temp = head;
+	p = (pow(2,M_SRRIP)-1);
+	while(temp->way_next != Null)
+	{
+		if(temp->re_reference_value==p)
+		{
+			return temp;
+		}
+		else if (temp->re_reference_value>max)
+		{
+			max = temp->re_reference_value;
+		}
+		temp = temp->way_next
+	}
+	temp = head;
+	while(temp->way_next != NULL)
+	{
+		temp->re_reference_value += (p-max);
+		temp = temp->way_next;
+	}
+	while(temp->way_next != Null)
+        {
+                if(temp->re_reference_value==p)
+                {
+                        return temp;
+                }
+                temp = temp->way_next
+        }
+}
 
 /* unlink BLK from the hash table bucket chain in SET */
 static void
@@ -274,7 +311,7 @@ cache_create(char *name,		/* name of the cache */
 {
   struct cache_t *cp;
   struct cache_blk_t *blk;
-  int i, j, bindex;
+  int i, j, k, bindex;
 
   /* check all cache parameters */
   if (nsets <= 0)
@@ -378,7 +415,11 @@ cache_create(char *name,		/* name of the cache */
 	  bindex++;
 
 	  /* invalidate new cache block */
-	  blk->re_reference_value = 3;
+	  blk->re_reference_value = 1;
+	  for(k=0;k<M_SRRIP-1;k++)
+	  {
+		(blk->re_reference_value<<1)|1;
+	  }
 	  blk->status = 0;
 	  blk->tag = 0;
 	  blk->ready = 0;
