@@ -137,6 +137,8 @@
     }\
   }
 
+
+  
 /* bound sqword_t/dfloat_t to positive int */
 #define BOUND_POS(N)		((int)(MIN(MAX(0, (N)), 2147483647)))
 #define M_SRRIP 2
@@ -613,6 +615,9 @@ cache_access(struct cache_t *cp,	/* cache to access */
      the appropriate place in the way list */
   switch (cp->policy) {
   case LRU:
+	repl = SRRIP_update_replace(&cp->sets[set].way_head);
+	update_way_list(&cp->sets[set],repl,Head);
+	break;
   case FIFO:
     repl = cp->sets[set].way_tail;
     update_way_list(&cp->sets[set], repl, Head);
