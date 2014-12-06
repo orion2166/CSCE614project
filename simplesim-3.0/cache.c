@@ -162,6 +162,7 @@ struct cache_blk_t* SRRIP_update_replace(struct cache_blk_t *head)
 		}
 		temp = temp->way_next;
 	}
+	/*
 	temp = head;
 	while(temp->way_next != NULL)
 	{
@@ -176,6 +177,8 @@ struct cache_blk_t* SRRIP_update_replace(struct cache_blk_t *head)
                 }
                 temp = temp->way_next;
         }
+		*/
+		return NULL;
 }
 
 /* unlink BLK from the hash table bucket chain in SET */
@@ -617,7 +620,6 @@ cache_access(struct cache_t *cp,	/* cache to access */
   case LRU:
 	repl = SRRIP_update_replace(&cp->sets[set].way_head);
 	update_way_list(&cp->sets[set],repl,Head);
-	break;
   case FIFO:
     repl = cp->sets[set].way_tail;
     update_way_list(&cp->sets[set], repl, Head);
