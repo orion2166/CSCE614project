@@ -262,10 +262,10 @@ struct cache_blk_t* LRU_search(struct cache_blk_t *a, int size, tick_t now)
     int i,max=0,indx=0;
     for(i=0;i<size;i++)
     {
-	if(a[i].status == 0)
-	{
-	    return &a[i];
-	}
+		if(a[i].status == 0)
+		{
+			return &a[i];
+		}
     }
     for(i=0;i<size;i++)
     {
@@ -431,7 +431,7 @@ cache_create(char *name,		/* name of the cache */
 	for(bindex = 0,i = 0;i < nsets;i++)
 	{
 		cp->LRU_list[i].blks = CACHE_BINDEX(cp, cp->data, bindex);
-		for(j = 0;i < assoc;j++)
+		for(j = 0;j < assoc;j++)
 		{
 			blk = CACHE_BINDEX(cp, cp->data, bindex);
 			bindex++;
