@@ -150,7 +150,7 @@ struct cache_blk_t* SRRIP_update_replace(struct cache_blk_t *head)
 	int max=0,p;
 	temp = head;
 	p = (pow(2,M_SRRIP)-1);
-	while(temp->way_next != NULL)
+	while(temp->way_next)
 	{
 		if(temp->re_reference_value==p)
 		{
@@ -163,12 +163,13 @@ struct cache_blk_t* SRRIP_update_replace(struct cache_blk_t *head)
 		temp = temp->way_next;
 	}
 	temp = head;
-	while(temp->way_next != NULL)
+	while(temp->way_next)
 	{
 		temp->re_reference_value += (p-max);
 		temp = temp->way_next;
 	}
-	while(temp->way_next != NULL)
+	temp = head;
+	while(temp->way_next)
         {
                 if(temp->re_reference_value==p)
                 {
@@ -718,7 +719,9 @@ cache_access(struct cache_t *cp,	/* cache to access */
   /* if LRU replacement and this is not the first element of list, reorder */
   if (blk->way_prev && cp->policy == LRU)
     {
-      /* move this block to head of the way (MRU) list */
+      
+	/* move this block to head of the way (MRU) list */
+	blk -> re_reference_value = 0;
       update_way_list(&cp->sets[set], blk, Head);
     }
 
