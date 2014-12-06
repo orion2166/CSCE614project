@@ -144,13 +144,13 @@
 #define M_SRRIP 2
 
 /* Searches for block closest to head of waylist that has value 2^M -1 else increase them all */
-struct cache_blk_t* search_RRIP(struct cache_blk_t *head)
+struct cache_blk_t* SRRIP_update_replace(struct cache_blk_t *head)
 {
 	struct cache_blk_t *temp;
 	int max=0,p;
 	temp = head;
 	p = (pow(2,M_SRRIP)-1);
-	while(temp->way_next != Null)
+	while(temp->way_next != NULL)
 	{
 		if(temp->re_reference_value==p)
 		{
@@ -160,7 +160,7 @@ struct cache_blk_t* search_RRIP(struct cache_blk_t *head)
 		{
 			max = temp->re_reference_value;
 		}
-		temp = temp->way_next
+		temp = temp->way_next;
 	}
 	temp = head;
 	while(temp->way_next != NULL)
@@ -168,13 +168,13 @@ struct cache_blk_t* search_RRIP(struct cache_blk_t *head)
 		temp->re_reference_value += (p-max);
 		temp = temp->way_next;
 	}
-	while(temp->way_next != Null)
+	while(temp->way_next != NULL)
         {
                 if(temp->re_reference_value==p)
                 {
                         return temp;
                 }
-                temp = temp->way_next
+                temp = temp->way_next;
         }
 }
 
