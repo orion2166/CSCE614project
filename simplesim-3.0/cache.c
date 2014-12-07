@@ -144,42 +144,49 @@
 #define M_SRRIP 2
 
 /* Searches for block closest to head of waylist that has value 2^M -1 else increase them all */
-struct cache_blk_t* SRRIP_update_replace(struct cache_blk_t *head)
+struct cache_blk_t* SRRIP_update_replace(struct cache_set_t *head)
 {
 	struct cache_blk_t *temp;
 	int max=0,p;
-	temp = head;
+	temp = head->way_head;
 	p = (pow(2,M_SRRIP)-1);
-	while(temp->way_next)
+	
+	printf("D %d, %d,%d\n",(int)temp,(int)temp->way_prev,temp->re_reference_value);
+	while(temp->way_prev)
 	{
+	printf("C %d, %d\n",(int)temp,temp->re_reference_value);
 		if(temp->re_reference_value==p)
 		{
+	printf("A %d\n",(int)temp);
+			 temp -> re_reference_value = (pow(2,M_SRRIP)-2);
 			return temp;
 		}
 		else if (temp->re_reference_value>max)
 		{
 			max = temp->re_reference_value;
 		}
-		temp = temp->way_next;
+		temp = temp->way_prev;
 	}
-	/*
-	temp = head;
-	while(temp->way_next)
+	printf("B %d\n",(int)temp->way_prev);
+	temp = head->way_head;
+	while(temp->way_prev)
 	{
 		temp->re_reference_value += (p-max);
-		temp = temp->way_next;
+		temp = temp->way_prev;
 	}
-	temp = head;
-	while(temp->way_next)
+	temp = head->way_head;
+	
+	printf("B %d\n",(int)temp->way_prev);
+while(temp->way_prev)
         {
                 if(temp->re_reference_value==p)
                 {
+	printf("B %d\n",(int)temp);
+			temp -> re_reference_value = (pow(2,M_SRRIP)-2);
                         return temp;
                 }
-                temp = temp->way_next;
+                temp = temp->way_prev;
         }
-		*/
-		return NULL;
 }
 
 /* unlink BLK from the hash table bucket chain in SET */
@@ -421,11 +428,7 @@ cache_create(char *name,		/* name of the cache */
 	  bindex++;
 
 	  /* invalidate new cache block */
-	  blk->re_reference_value = 1;
-	  for(k=0;k<M_SRRIP-1;k++)
-	  {
-		(blk->re_reference_value<<1)|1;
-	  }
+	  blk -> re_reference_value = (pow(2,M_SRRIP)-1);
 	  blk->status = 0;
 	  blk->tag = 0;
 	  blk->ready = 0;
@@ -538,7 +541,7 @@ cache_stats(struct cache_t *cp,		/* cache instance */
 	  (double)cp->misses/sum, (double)(double)cp->replacements/sum,
 	  (double)cp->invalidations/sum);
 }
-
+int first_rep = 0;
 /* access a cache, perform a CMD operation on cache CP at address ADDR,
    places NBYTES of data at *P, returns latency of operation if initiated
    at NOW, places pointer to block user data in *UDATA, *P is untouched if
@@ -614,16 +617,24 @@ cache_access(struct cache_t *cp,	/* cache to access */
 
   /* **MISS** */
   cp->misses++;
-
   /* select the appropriate block to replace, and re-link this entry to
      the appropriate place in the way list */
   switch (cp->policy) {
   case LRU:
-	repl = SRRIP_update_replace(&cp->sets[set].way_head);
+	if(!first_rep)
+  {  repl = cp->sets[set].way_tail; first_rep =1;}
+	else
+	repl = SRRIP_update_replace(&cp->sets[set]);
+	//printf("1 %d, %d\n",(int)repl,(int)repl ->way_prev);
 	update_way_list(&cp->sets[set],repl,Head);
+	break;
   case FIFO:
     repl = cp->sets[set].way_tail;
-    update_way_list(&cp->sets[set], repl, Head);
+   printf("2 %d, %d, %d\n",(int)repl,(int)repl ->way_prev,(int)repl->way_next );
+//if(loser == 2)
+//for(;;);
+//loser++;
+	update_way_list(&cp->sets[set], repl, Head);
     break;
   case Random:
     {
