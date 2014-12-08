@@ -141,7 +141,7 @@
   
 /* bound sqword_t/dfloat_t to positive int */
 #define BOUND_POS(N)		((int)(MIN(MAX(0, (N)), 2147483647)))
-#define M_SRRIP 2
+#define M_SRRIP 1
 
 /* Searches for block closest to head of waylist that has value 2^M -1 else increase them all */
 struct cache_blk_t* SRRIP_update_replace(struct cache_set_t *set)
@@ -453,7 +453,8 @@ enum cache_policy			/* replacement policy enum */
 cache_char2policy(char c)		/* replacement policy as a char */
 {
   switch (c) {
-  case 's': return SRRIP;
+  case 'h': return HP_SRRIP;
+  case 's': return FP_SRRIP;
   case 'd': return DRRIP;
   case 'l': return LRU;
   case 'r': return Random;
@@ -474,7 +475,8 @@ cache_config(struct cache_t *cp,	/* cache instance */
 	  "cache: %s: %d-way, `%s' replacement policy, write-back\n",
 	  cp->name, cp->assoc,
 	  cp->policy == LRU ? "LRU"
-	  : cp->policy == SRRIP ? "SRRIP"
+	  : cp->policy == HP_SRRIP ? "HP_SRRIP"
+	  : cp->policy == FP_SRRIP ? "FP_SRRIP"
 	  : cp->policy == DRRIP ? "DRRIP"
 	  : cp->policy == Random ? "Random"
 	  : cp->policy == FIFO ? "FIFO"
@@ -620,7 +622,8 @@ cache_access(struct cache_t *cp,	/* cache to access */
   /* select the appropriate block to replace, and re-link this entry to
      the appropriate place in the way list */
   switch (cp->policy) {
-  case SRRIP:
+  case HP_SRRIP:
+  case FP_SRRIP:
 	repl = SRRIP_update_replace(&cp->sets[set]);
 	update_way_list(&cp->sets[set],repl, Head);
 	break;
@@ -722,19 +725,24 @@ cache_access(struct cache_t *cp,	/* cache to access */
   if (cmd == Write)
     blk->status |= CACHE_BLK_DIRTY;
 
-  /* if LRU replacement and this is not the first element of list, reorder */
-  if (blk->way_prev && cp->policy == LRU)
+  /* if HP_SRRIP replacement and this is not the first element of list, reorder */
+  if (cp->policy == HP_SRRIP)
+    {
+        blk -> re_reference_value = 0;
+    }
+
+    /* if FP_SRRIP replacement and this is not the first element of list, reorder */
+  if (cp->policy == FP_SRRIP)
+    {
+        if(blk -> re_reference_value>0)
+                blk -> re_reference_value--;
+    }
+
+  /* if LRU, HP-SRRIP, FP-SRRIP replacement and this is not the first element of list, reorder */
+  if (blk->way_prev && (cp->policy == LRU || cp->policy == HP_SRRIP || cp->policy == FP_SRRIP))
     {
       
 	/* move this block to head of the way (MRU) list */
-        update_way_list(&cp->sets[set], blk, Head);
-    }
-    /* if SRRIP replacement and this is not the first element of list, reorder */
-  if (blk->way_prev && cp->policy == SRRIP)
-    {
-
-        /* move this block to head of the way (MRU) list */
-        blk -> re_reference_value = 0;
         update_way_list(&cp->sets[set], blk, Head);
     }
 
@@ -769,6 +777,13 @@ cache_access(struct cache_t *cp,	/* cache to access */
   /* this block hit last, no change in the way list */
 
   /* tag is unchanged, so hash links (if they exist) are still valid */
+
+  /* if FP_SRRIP replacement and this is not the first element of list, reorder */
+  if (cp->policy == FP_SRRIP)
+    {
+        if(blk -> re_reference_value>0)
+                blk -> re_reference_value--;
+    }
 
   /* get user block data, if requested and it exists */
   if (udata)
