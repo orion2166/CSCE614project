@@ -144,48 +144,44 @@
 #define M_SRRIP 2
 
 /* Searches for block closest to head of waylist that has value 2^M -1 else increase them all */
-struct cache_blk_t* SRRIP_update_replace(struct cache_set_t *head)
+struct cache_blk_t* SRRIP_update_replace(struct cache_set_t *set)
 {
 	struct cache_blk_t *temp;
 	int max=0,p;
-	temp = head->way_head;
 	p = (pow(2,M_SRRIP)-1);
+	temp = set->way_head;
 	
-	printf("D %d, %d,%d\n",(int)temp,(int)temp->way_prev,temp->re_reference_value);
-	while(temp->way_prev)
+	//printf("A temp=%d, prev=%d, next=%d, ref=%d\n",(int)temp,(int)temp->way_prev,temp->way_next,temp->re_reference_value);
+	while(temp)
 	{
-	printf("C %d, %d\n",(int)temp,temp->re_reference_value);
+		//printf("B %d, %d\n",(int)temp,temp->re_reference_value);
 		if(temp->re_reference_value==p)
 		{
-	printf("A %d\n",(int)temp);
-			 temp -> re_reference_value = (pow(2,M_SRRIP)-2);
+			temp -> re_reference_value = p-1;
 			return temp;
 		}
 		else if (temp->re_reference_value>max)
 		{
 			max = temp->re_reference_value;
 		}
-		temp = temp->way_prev;
+		temp = temp->way_next;
 	}
-	printf("B %d\n",(int)temp->way_prev);
-	temp = head->way_head;
-	while(temp->way_prev)
+	temp = set->way_head;
+	while(temp)
 	{
-		temp->re_reference_value += (p-max);
-		temp = temp->way_prev;
+		temp->re_reference_value = temp->re_reference_value + (p-max);
+		temp = temp->way_next;
 	}
-	temp = head->way_head;
+	temp = set->way_head;
 	
-	printf("B %d\n",(int)temp->way_prev);
-while(temp->way_prev)
+	while(temp)
         {
                 if(temp->re_reference_value==p)
                 {
-	printf("B %d\n",(int)temp);
-			temp -> re_reference_value = (pow(2,M_SRRIP)-2);
+			temp -> re_reference_value = p-1;
                         return temp;
                 }
-                temp = temp->way_prev;
+                temp = temp->way_next;
         }
 }
 
@@ -324,7 +320,7 @@ cache_create(char *name,		/* name of the cache */
 {
   struct cache_t *cp;
   struct cache_blk_t *blk;
-  int i, j, k, bindex;
+  int i, j, bindex;
 
   /* check all cache parameters */
   if (nsets <= 0)
@@ -457,6 +453,8 @@ enum cache_policy			/* replacement policy enum */
 cache_char2policy(char c)		/* replacement policy as a char */
 {
   switch (c) {
+  case 's': return SRRIP;
+  case 'd': return DRRIP;
   case 'l': return LRU;
   case 'r': return Random;
   case 'f': return FIFO;
@@ -476,6 +474,8 @@ cache_config(struct cache_t *cp,	/* cache instance */
 	  "cache: %s: %d-way, `%s' replacement policy, write-back\n",
 	  cp->name, cp->assoc,
 	  cp->policy == LRU ? "LRU"
+	  : cp->policy == SRRIP ? "SRRIP"
+	  : cp->policy == DRRIP ? "DRRIP"
 	  : cp->policy == Random ? "Random"
 	  : cp->policy == FIFO ? "FIFO"
 	  : (abort(), ""));
@@ -620,20 +620,13 @@ cache_access(struct cache_t *cp,	/* cache to access */
   /* select the appropriate block to replace, and re-link this entry to
      the appropriate place in the way list */
   switch (cp->policy) {
-  case LRU:
-	if(!first_rep)
-  {  repl = cp->sets[set].way_tail; first_rep =1;}
-	else
+  case SRRIP:
 	repl = SRRIP_update_replace(&cp->sets[set]);
-	//printf("1 %d, %d\n",(int)repl,(int)repl ->way_prev);
-	update_way_list(&cp->sets[set],repl,Head);
+	update_way_list(&cp->sets[set],repl, Head);
 	break;
+  case LRU:
   case FIFO:
-    repl = cp->sets[set].way_tail;
-   printf("2 %d, %d, %d\n",(int)repl,(int)repl ->way_prev,(int)repl->way_next );
-//if(loser == 2)
-//for(;;);
-//loser++;
+    	repl = cp->sets[set].way_tail;
 	update_way_list(&cp->sets[set], repl, Head);
     break;
   case Random:
@@ -734,8 +727,15 @@ cache_access(struct cache_t *cp,	/* cache to access */
     {
       
 	/* move this block to head of the way (MRU) list */
-	blk -> re_reference_value = 0;
-      update_way_list(&cp->sets[set], blk, Head);
+        update_way_list(&cp->sets[set], blk, Head);
+    }
+    /* if SRRIP replacement and this is not the first element of list, reorder */
+  if (blk->way_prev && cp->policy == SRRIP)
+    {
+
+        /* move this block to head of the way (MRU) list */
+        blk -> re_reference_value = 0;
+        update_way_list(&cp->sets[set], blk, Head);
     }
 
   /* tag is unchanged, so hash links (if they exist) are still valid */
