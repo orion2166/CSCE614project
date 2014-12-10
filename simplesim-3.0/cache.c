@@ -141,7 +141,7 @@
   
 /* bound sqword_t/dfloat_t to positive int */
 #define BOUND_POS(N)		((int)(MIN(MAX(0, (N)), 2147483647)))
-#define M_SRRIP 1
+#define M_SRRIP 3
 
 /* Searches for block closest to head of waylist that has value 2^M -1 else increase them all */
 struct cache_blk_t* SRRIP_update_replace(struct cache_set_t *set)
@@ -149,12 +149,10 @@ struct cache_blk_t* SRRIP_update_replace(struct cache_set_t *set)
 	struct cache_blk_t *temp;
 	int max=0,p;
 	p = (pow(2,M_SRRIP)-1);
-	temp = set->way_head;
-	
-	//printf("A temp=%d, prev=%d, next=%d, ref=%d\n",(int)temp,(int)temp->way_prev,temp->way_next,temp->re_reference_value);
+	temp = set->way_tail;
 	while(temp)
 	{
-		//printf("B %d, %d\n",(int)temp,temp->re_reference_value);
+		//printf("%d,",temp->re_reference_value);
 		if(temp->re_reference_value==p)
 		{
 			temp -> re_reference_value = p-1;
@@ -164,15 +162,15 @@ struct cache_blk_t* SRRIP_update_replace(struct cache_set_t *set)
 		{
 			max = temp->re_reference_value;
 		}
-		temp = temp->way_next;
+		temp = temp->way_prev;
 	}
-	temp = set->way_head;
+	temp = set->way_tail;
 	while(temp)
 	{
 		temp->re_reference_value = temp->re_reference_value + (p-max);
-		temp = temp->way_next;
+		temp = temp->way_prev;
 	}
-	temp = set->way_head;
+	temp = set->way_tail;
 	
 	while(temp)
         {
@@ -181,7 +179,7 @@ struct cache_blk_t* SRRIP_update_replace(struct cache_set_t *set)
 			temp -> re_reference_value = p-1;
                         return temp;
                 }
-                temp = temp->way_next;
+                temp = temp->way_prev;
         }
 }
 
